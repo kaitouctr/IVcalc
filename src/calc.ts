@@ -356,17 +356,17 @@ function narrowByHiddenPower(
   // 4.2 is calculated from 1 / (15 / 63) which is the remaining part of the
   // equation after removing ivLSBs from it
   // Based off https://math.stackexchange.com/a/1683536
-
-  // lower limit of ivLSBs for target type
-  const y = Math.ceil(4.2 * HiddenPowerTypes[targetHPType]);
+  
+  const lowerBound = Math.ceil(4.2 * HiddenPowerTypes[targetHPType]);
   // upper limit of ivLSBs + 1
-  const z = Math.ceil(4.2 * (HiddenPowerTypes[targetHPType] + 1));
-  const xRange: number[] = [];
+  let upperBound = Math.ceil(4.2 * (HiddenPowerTypes[targetHPType] + 1));
   // Enforce upper limit of 63
-  for (let i = y; i < (z <= 64 ? z : 64); i++) {
-    xRange.push(i);
-  }
-  for (const ivLSBs of xRange) {
+  upperBound = upperBound <= 64 ? upperBound : 64
+  for (
+    let ivLSBs = lowerBound;
+    ivLSBs < upperBound;
+    ivLSBs++
+  ) {
     hpRange.add(ivLSBs & 1);
     atkRange.add((ivLSBs >> 1) & 1);
     defRange.add((ivLSBs >> 2) & 1);
