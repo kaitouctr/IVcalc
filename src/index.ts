@@ -19,7 +19,7 @@
 'use strict';
 
 import Papa from 'papaparse';
-import { StatLevel, calculateIVs } from './calc';
+import { StatLevel, calcIVRanges, getNextLevel } from './calc';
 
 // Type/interface declarations
 
@@ -336,53 +336,49 @@ mainForm.addEventListener('submit', function (e) {
     return;
   }
   let level = Number(params.get('initialLevel'));
-  statLevels.push({
-    Level: level,
-    HP: Number(params.get('initialHP')),
-    Attack: Number(params.get('initialAtk')),
-    Defense: Number(params.get('initialDef')),
-    SpAttack: Number(params.get('initialSpA')),
-    SpDefense: Number(params.get('initialSpD')),
-    Speed: Number(params.get('initialSpe')),
-    HPEV: Number(params.get('initialHPEV') ?? 0),
-    AttackEV: Number(params.get('initialAtkEV') ?? 0),
-    DefenseEV: Number(params.get('initialDefEV') ?? 0),
-    SpAttackEV: Number(params.get('initialSpAEV') ?? 0),
-    SpDefenseEV: Number(params.get('initialSpDEV') ?? 0),
-    SpeedEV: Number(params.get('initialSpeEV') ?? 0),
-  });
-  const mapStatLevel = (statLevel: number[]) => {
-    let hp: number;
-    let attack: number;
-    let defense: number;
-    let spAttack: number;
-    let spDefense: number;
-    let speed: number;
-    switch (params.get('calcMode') as string) {
-      case 'exact':
-        hp = statLevel[0];
-        attack = statLevel[1];
-        defense = statLevel[2];
-        spAttack = statLevel[3];
-        spDefense = statLevel[4];
-        speed = statLevel[5];
-        break;
-      case 'diff':
-        hp = statLevels[statLevels.length - 1].HP + statLevel[0];
-        attack = statLevels[statLevels.length - 1].Attack + statLevel[1];
-        defense = statLevels[statLevels.length - 1].Defense + statLevel[2];
-        spAttack = statLevels[statLevels.length - 1].SpAttack + statLevel[3];
-        spDefense = statLevels[statLevels.length - 1].SpDefense + statLevel[4];
-        speed = statLevels[statLevels.length - 1].Speed + statLevel[5];
-        break;
-      default:
-        alert('Calculation mode is unset');
-        return;
+  const baseStats = {
+    HP: Number(params.get('baseHP')),
+    Attack: Number(params.get('baseAtk')),
+    Defense: Number(params.get('baseDef')),
+    SpAttack: Number(params.get('baseSpA')),
+    SpDefense: Number(params.get('baseSpD')),
+    Speed: Number(params.get('baseSpe')),
+  };
+  const mapStatLevel = (statLevel: number[], calcMode: string) => {
+    const statLevelIndex = {
+      HP: 0,
+      Attack: 1,
+      Defense: 2,
+      SpAttack: 3,
+      SpDefense: 4,
+      Speed: 5,
+    };
+    const monStats = {
+      HP: null as number,
+      Attack: null as number,
+      Defense: null as number,
+      SpAttack: null as number,
+      SpDefense: null as number,
+      Speed: null as number,
+    };
+    for (const stat of Object.keys(monStats)) {
+      const input = statLevel[statLevelIndex[stat] as number];
+      switch (calcMode) {
+        case 'exact':
+          monStats[stat] = input;
+          break;
+        case 'diff':
+          monStats[stat] =
+            (statLevels[statLevels.length - 1].Stats[stat] as number) + input;
+          break;
+        default:
+          alert('Calculation mode is unset');
+          return;
+      }
     }
-    return [hp, attack, defense, spAttack, spDefense, speed];
+    return monStats;
   };
   for (const statLevel of statInput) {
-    level += 1;
     if (statLevel.length === 1 && statLevel.includes(null)) {
       continue;
     }
@@ -390,57 +386,83 @@ mainForm.addEventListener('submit', function (e) {
       alert('Input is incorrectly formatted, please fix this.');
       return;
     }
-    const [
-      statLevelHP,
-      statLevelAtk,
-      statLevelDef,
-      statLevelSpA,
-      statLevelSpD,
-      statLevelSpe,
-    ] = mapStatLevel(statLevel);
+    // Hard pass initial stats as 'exact' mode
+    const calcMode =
+      level !== Number(params.get('initialLevel'))
+        ? (params.get('calcMode') as string)
+        : 'exact';
+    const stats = mapStatLevel(statLevel, calcMode);
     statLevels.push({
       Level: level,
-      HP: statLevelHP,
-      Attack: statLevelAtk,
-      Defense: statLevelDef,
-      SpAttack: statLevelSpA,
-      SpDefense: statLevelSpD,
-      Speed: statLevelSpe,
-      HPEV: statLevel[6] ?? 0,
-      AttackEV: statLevel[7] ?? 0,
-      DefenseEV: statLevel[8] ?? 0,
-      SpAttackEV: statLevel[9] ?? 0,
-      SpDefenseEV: statLevel[10] ?? 0,
-      SpeedEV: statLevel[11] ?? 0,
+      Stats: stats,
+      EV: {
+        HP: statLevel[6] ?? 0,
+        Attack: statLevel[7] ?? 0,
+        Defense: statLevel[8] ?? 0,
+        SpAttack: statLevel[9] ?? 0,
+        SpDefense: statLevel[10] ?? 0,
+        Speed: statLevel[11] ?? 0,
+      },
     });
+    level += 1;
   }
-  const [
-    hpIV,
-    atkIV,
-    defIV,
-    spaIV,
-    spdIV,
-    speIV,
-    nextHPLevel,
-    nextAtkLevel,
-    nextDefLevel,
-    nextSpALevel,
-    nextSpDLevel,
-    nextSpeLevel,
-  ] = calculateIVs(
-    {
-      HP: Number(params.get('baseHP')),
-      Attack: Number(params.get('baseAtk')),
-      Defense: Number(params.get('baseDef')),
-      SpAttack: Number(params.get('baseSpA')),
-      SpDefense: Number(params.get('baseSpD')),
-      Speed: Number(params.get('baseSpe')),
-    },
+  const ivRanges = calcIVRanges(
+    baseStats,
     statLevels,
     params.get('nature') as string,
     (params.get('characteristic') as string) || null,
     (params.get('hiddenPower') as string) || null,
   );
+  const nextLevels = {
+    HP: getNextLevel(
+      'HP',
+      baseStats.HP,
+      ivRanges.HP,
+      statLevels[statLevels.length - 1].EV.HP,
+      statLevels[statLevels.length - 1].Level,
+      null,
+    ),
+    Attack: getNextLevel(
+      'Attack',
+      baseStats.Attack,
+      ivRanges.Attack,
+      statLevels[statLevels.length - 1].EV.Attack,
+      statLevels[statLevels.length - 1].Level,
+      params.get('nature') as string,
+    ),
+    Defense: getNextLevel(
+      'Defense',
+      baseStats.Defense,
+      ivRanges.Defense,
+      statLevels[statLevels.length - 1].EV.Defense,
+      statLevels[statLevels.length - 1].Level,
+      params.get('nature') as string,
+    ),
+    SpAttack: getNextLevel(
+      'SpAttack',
+      baseStats.SpAttack,
+      ivRanges.SpAttack,
+      statLevels[statLevels.length - 1].EV.SpAttack,
+      statLevels[statLevels.length - 1].Level,
+      params.get('nature') as string,
+    ),
+    SpDefense: getNextLevel(
+      'SpDefense',
+      baseStats.SpDefense,
+      ivRanges.SpDefense,
+      statLevels[statLevels.length - 1].EV.SpDefense,
+      statLevels[statLevels.length - 1].Level,
+      params.get('nature') as string,
+    ),
+    Speed: getNextLevel(
+      'Speed',
+      baseStats.Speed,
+      ivRanges.Speed,
+      statLevels[statLevels.length - 1].EV.Speed,
+      statLevels[statLevels.length - 1].Level,
+      params.get('nature') as string,
+    ),
+  };
   const formatOutputIVs = (ivRange: number[]) => {
     if (!(ivRange.length > 0)) {
       return null;
@@ -456,24 +478,24 @@ mainForm.addEventListener('submit', function (e) {
     return ivRange.join(', ');
   };
   (mainFormItems['hpIV'] as HTMLOutputElement).value =
-    formatOutputIVs(hpIV) ?? 'Invalid';
+    formatOutputIVs(ivRanges.HP) ?? 'Invalid';
   (mainFormItems['attackIV'] as HTMLOutputElement).value =
-    formatOutputIVs(atkIV) ?? 'Invalid';
+    formatOutputIVs(ivRanges.Attack) ?? 'Invalid';
   (mainFormItems['defenseIV'] as HTMLOutputElement).value =
-    formatOutputIVs(defIV) ?? 'Invalid';
+    formatOutputIVs(ivRanges.Defense) ?? 'Invalid';
   (mainFormItems['spAttackIV'] as HTMLOutputElement).value =
-    formatOutputIVs(spaIV) ?? 'Invalid';
+    formatOutputIVs(ivRanges.SpAttack) ?? 'Invalid';
   (mainFormItems['spDefenseIV'] as HTMLOutputElement).value =
-    formatOutputIVs(spdIV) ?? 'Invalid';
+    formatOutputIVs(ivRanges.SpDefense) ?? 'Invalid';
   (mainFormItems['speedIV'] as HTMLOutputElement).value =
-    formatOutputIVs(speIV) ?? 'Invalid';
+    formatOutputIVs(ivRanges.Speed) ?? 'Invalid';
   (mainFormItems['nextLevel'] as HTMLOutputElement).value = [
-    nextHPLevel,
-    nextAtkLevel,
-    nextDefLevel,
-    nextSpALevel,
-    nextSpDLevel,
-    nextSpeLevel,
+    nextLevels.HP,
+    nextLevels.Attack,
+    nextLevels.Defense,
+    nextLevels.SpAttack,
+    nextLevels.SpDefense,
+    nextLevels.Speed,
   ]
     .map(level => String(level ?? 'Invalid'))
     .join(', ');
