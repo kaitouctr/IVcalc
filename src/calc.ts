@@ -156,22 +156,22 @@ function calcOtherStat(
 
 function narrowByHiddenPower(hiddenPower: string) {
   const HiddenPowerTypes = {
-    0: 'Fighting',
-    1: 'Flying',
-    2: 'Poison',
-    3: 'Ground',
-    4: 'Rock',
-    5: 'Bug',
-    6: 'Ghost',
-    7: 'Steel',
-    8: 'Fire',
-    9: 'Water',
-    10: 'Grass',
-    11: 'Electric',
-    12: 'Psychic',
-    13: 'Ice',
-    14: 'Dragon',
-    15: 'Dark',
+    Fighting: 0,
+    Flying: 1,
+    Poison: 2,
+    Ground: 3,
+    Rock: 4,
+    Bug: 5,
+    Ghost: 6,
+    Steel: 7,
+    Fire: 8,
+    Water: 9,
+    Grass: 10,
+    Electric: 11,
+    Psychic: 12,
+    Ice: 13,
+    Dragon: 14,
+    Dark: 15,
   };
   const lsbRanges = {
     HP: new Set<number>(),
@@ -181,39 +181,26 @@ function narrowByHiddenPower(hiddenPower: string) {
     SpDefense: new Set<number>(),
     Speed: new Set<number>(),
   };
-  /*
-   *  Below loops through all possible combinations of LSBs of the
-   *  six stats. This creates a lookup table on the fly for
-   *  a specific hidden power.
-   */
-  for (const hpLSB of [0, 1]) {
-    for (const atkLSB of [0, 1]) {
-      for (const defLSB of [0, 1]) {
-        for (const speLSB of [0, 1]) {
-          for (const spaLSB of [0, 1]) {
-            for (const spdLSB of [0, 1]) {
-              const hpType = Math.floor(
-                ((hpLSB +
-                  2 * atkLSB +
-                  4 * defLSB +
-                  8 * speLSB +
-                  16 * spaLSB +
-                  32 * spdLSB) *
-                  15) /
-                  63,
-              );
-              if (!(HiddenPowerTypes[hpType] === hiddenPower)) continue;
-              lsbRanges.HP.add(hpLSB);
-              lsbRanges.Attack.add(atkLSB);
-              lsbRanges.Defense.add(defLSB);
-              lsbRanges.Speed.add(speLSB);
-              lsbRanges.SpAttack.add(spaLSB);
-              lsbRanges.SpDefense.add(spdLSB);
-            }
-          }
-        }
-      }
-    }
+  // In here, ivLSBs is the binary number formed from
+  // hpLSB + 2 * atkLSB + 4 * defLSB + 8 * speLSB + 16 * spaLSB + 32 * spdLSB
+  // in the hidden power formula
+  // (15 / 63) is the remaining part of the equation after removing ivLSBs
+  // Based off https://math.stackexchange.com/a/1683536
+  const minIVLSBs = Math.max(
+    Math.ceil(HiddenPowerTypes[hiddenPower] / (15 / 63)),
+    0,
+  );
+  const maxIVLSBS = Math.min(
+    Math.ceil(HiddenPowerTypes[hiddenPower] + 1) / (15 / 63) - 1,
+    63,
+  );
+  for (let ivLSBs = minIVLSBs; ivLSBs <= maxIVLSBS; ivLSBs++) {
+    lsbRanges.HP.add((ivLSBs >> 0) & 1);
+    lsbRanges.Attack.add((ivLSBs >> 1) & 1);
+    lsbRanges.Defense.add((ivLSBs >> 2) & 1);
+    lsbRanges.Speed.add((ivLSBs >> 3) & 1);
+    lsbRanges.SpAttack.add((ivLSBs >> 4) & 1);
+    lsbRanges.SpDefense.add((ivLSBs >> 5) & 1);
   }
   return lsbRanges;
 }
